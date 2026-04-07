@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GrandStay | Premium Analytics Dashboard</title>
+    <!-- Chart.js CDN for beautiful charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        /* Dark Theme Variables */
+        :root {
+            --bg-primary: #070b12;
+            --bg-secondary: #0a101c;
+            --bg-card: rgba(12, 20, 30, 0.85);
+            --bg-card-solid: #0f172a;
+            --border-color: rgba(34, 211, 238, 0.25);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent: #22D3EE;
+            --accent-glow: rgba(34, 211, 238, 0.2);
+            --sidebar-width: 260px;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+
+        body.light {
+            --bg-primary: #f0f4f8;
+            --bg-secondary: #ffffff;
+            --bg-card: rgba(255, 255, 255, 0.9);
+            --bg-card-solid: #ffffff;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --border-color: rgba(0, 150, 200, 0.3);
+        }
+
+        /* Loader */
+        .loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-primary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s;
+        }
+
+        .loader.hide {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Dashboard Layout */
+        .dashboard-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--bg-secondary);
+            backdrop-filter: blur(16px);
+            border-right: 1px solid var(--border-color);
+            position: fixed;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s;
+            z-index: 100;
+        }
+
+        .sidebar-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #A5F3FC, var(--accent));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .nav-menu {
+            flex: 1;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            border-radius: 40px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .nav-item:hover, .nav-item.active {
+            background: var(--accent-glow);
+            color: var(--accent);
+        }
+
+        .sidebar-footer {
+            padding: 1.5rem;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .theme-toggle, .logout-btn {
+            padding: 10px;
+            border-radius: 40px;
+            border: 1px solid var(--border-color);
+            background: transparent;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .theme-toggle:hover, .logout-btn:hover {
+            background: var(--accent-glow);
+            border-color: var(--accent);
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            flex: 1;
+            padding: 1.5rem;
+        }
+
+        /* Top Header */
+        .top-header {
+            background: var(--bg-card);
+            backdrop-filter: blur(8px);
+            padding: 1rem 1.5rem;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        /* Pages */
+        .page {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* KPI Cards */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .kpi-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: all 0.3s;
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-3px);
+            border-color: var(--accent);
+            box-shadow: 0 5px 20px var(--accent-glow);
+        }
+
+        .kpi-icon {
+            font-size: 2rem;
+        }
+
+        .kpi-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .kpi-info h4 {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        /* Charts Grid */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .chart-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 1rem;
+            transition: all 0.3s;
+        }
+
+        .chart-card:hover {
+            border-color: var(--accent);
+        }
+
+        .chart-card h3 {
+            margin-bottom: 1rem;
+            font-size: 1rem;
+            color: var(--text-secondary);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 250px;
+        }
+
+        canvas {
+            max-height: 100%;
+            width: 100%;
+        }
+
+        /* Stats Row */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        /* Table Styles */
+        .data-table {
+            background: var(--bg-card);
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            overflow-x: auto;
+        }
+
+        .data-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th, .data-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .data-table th {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        /* Embed Container */
+        .embed-container {
+            background: var(--bg-card);
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            margin-top: 1.5rem;
+        }
+
+        .embed-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .iframe-wrapper {
+            height: 450px;
+        }
+
+        .iframe-wrapper iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        /* Insights & Tech */
+        .insights-grid, .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+
+        .insight-card, .tech-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1rem;
+            transition: all 0.3s;
+        }
+
+        .insight-card:hover, .tech-card:hover {
+            transform: scale(1.02);
+            border-color: var(--accent);
+        }
+
+        /* Contact Form */
+        .contact-form {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 10px 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-color);
+            border-radius: 30px;
+            color: var(--text-primary);
+            outline: none;
+        }
+
+        .form-group input:focus, .form-group textarea:focus {
+            border-color: var(--accent);
+        }
+
+        .submit-btn {
+            background: linear-gradient(95deg, #0F172A, #1E293B);
+            border: 1px solid var(--accent);
+            padding: 10px 25px;
+            border-radius: 30px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .submit-btn:hover {
+            transform: scale(1.02);
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 1rem;
+            border-top: 1px solid var(--border-color);
+            margin-top: 1.5rem;
+        }
+
+        .social-links {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .social-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .social-links a:hover {
+            color: var(--accent);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 70px;
+            }
+            .sidebar .logo span, .sidebar .nav-text {
+                display: none;
+            }
+            .main-content {
+                margin-left: 70px;
+                padding: 1rem;
+            }
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            .kpi-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="loader" id="loader">
+        <div class="spinner"></div>
+        <p>Loading GrandStay Analytics...</p>
+    </div>
+
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">🏨 <span>GrandStay</span></div>
+            </div>
+            <nav class="nav-menu">
+                <div class="nav-item active" data-page="overview">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-text">Overview</span>
+                </div>
+                <div class="nav-item" data-page="dashboard">
+                    <span class="nav-icon">📈</span>
+                    <span class="nav-text">Analytics</span>
+                </div>
+                <div class="nav-item" data-page="insights">
+                    <span class="nav-icon">💡</span>
+                    <span class="nav-text">Insights</span>
+                </div>
+                <div class="nav-item" data-page="technologies">
+                    <span class="nav-icon">⚙️</span>
+                    <span class="nav-text">Technologies</span>
+                </div>
+                <div class="nav-item" data-page="contact">
+                    <span class="nav-icon">✉️</span>
+                    <span class="nav-text">Contact</span>
+                </div>
+            </nav>
+            <div class="sidebar-footer">
+                <button class="theme-toggle" id="themeToggle">🌓 Dark/Light</button>
+                <button class="logout-btn" id="logoutBtn">🚪 Logout</button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="top-header">
+                <div>
+                    <h2>Welcome back, <span id="userName">Admin</span> 👋</h2>
+                    <p id="dateTime" style="font-size: 0.8rem; color: var(--text-secondary);"></p>
+                </div>
+            </div>
+
+            <!-- Overview Page with Custom Charts -->
+            <div id="overviewPage" class="page active">
+                <!-- KPI Cards -->
+                <div class="kpi-grid">
+                    <div class="kpi-card"><div class="kpi-icon">💰</div><div class="kpi-info"><h4>Total Revenue</h4><div class="kpi-value">₹13.28 Cr</div></div></div>
+                    <div class="kpi-card"><div class="kpi-icon">🍽️</div><div class="kpi-info"><h4>F&B Revenue</h4><div class="kpi-value">₹8.92L</div></div></div>
+                    <div class="kpi-card"><div class="kpi-icon">💆</div><div class="kpi-info"><h4>Spa Revenue</h4><div class="kpi-value">₹5.89L</div></div></div>
+                    <div class="kpi-card"><div class="kpi-icon">⭐</div><div class="kpi-info"><h4>Avg Rating</h4><div class="kpi-value">5.87/10</div></div></div>
+                    <div class="kpi-card"><div class="kpi-icon">🏨</div><div class="kpi-info"><h4>Total Bookings</h4><div class="kpi-value">1,248</div></div></div>
+                    <div class="kpi-card"><div class="kpi-icon">🌙</div><div class="kpi-info"><h4>Occupancy Rate</h4><div class="kpi-value">74%</div></div></div>
+                </div>
+
+                <!-- Stats Row -->
+                <div class="stats-row">
+                    <div class="stat-card"><div class="stat-number">₹2.1Cr</div><div>Peak Month (Oct 2024)</div></div>
+                    <div class="stat-card"><div class="stat-number">37%</div><div>Agent Bookings</div></div>
+                    <div class="stat-card"><div class="stat-number">28%</div><div>Indian Guests</div></div>
+                    <div class="stat-card"><div class="stat-number">19%</div><div>Upsell Growth</div></div>
+                </div>
+
+                <!-- Charts Grid -->
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h3>📈 Monthly Revenue Trend (2024)</h3>
+                        <div class="chart-container">
+                            <canvas id="revenueChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>🥧 Bookings by Room Type</h3>
+                        <div class="chart-container">
+                            <canvas id="roomChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>⭐ Guest Ratings Distribution</h3>
+                        <div class="chart-container">
+                            <canvas id="ratingChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>🏆 Top Properties by Revenue</h3>
+                        <div class="chart-container">
+                            <canvas id="propertyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top Performers Table -->
+                <div class="data-table">
+                    <table>
+                        <thead>
+                            <tr><th>Property Name</th><th>City</th><th>Total Revenue</th><th>Avg Rating</th><th>Bookings</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>GrandStay Jaipur</td><td>Jaipur</td><td>₹3.2 Cr</td><td>6.2 ⭐</td><td>245</td></tr>
+                            <tr><td>GrandStay Mumbai</td><td>Mumbai</td><td>₹2.8 Cr</td><td>6.8 ⭐</td><td>198</td></tr>
+                            <tr><td>GrandStay Delhi</td><td>Delhi</td><td>₹2.5 Cr</td><td>5.4 ⭐</td><td>187</td></tr>
+                            <tr><td>GrandStay Bengaluru</td><td>Bengaluru</td><td>₹2.3 Cr</td><td>5.2 ⭐</td><td>176</td></tr>
+                            <tr><td>GrandStay Goa</td><td>Goa</td><td>₹1.8 Cr</td><td>5.9 ⭐</td><td>142</td></tr>
+                            <tr><td>GrandStay Chennai</td><td>Chennai</td><td>₹1.6 Cr</td><td>5.1 ⭐</td><td>138</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Cognos Dashboard Embed -->
+                <div class="embed-container">
+                    <div class="embed-header">
+                        <h3>📊 IBM Cognos Analytics Dashboard</h3>
+                        <span style="font-size:0.7rem; color:var(--accent);">Live Data</span>
+                    </div>
+                    <div class="iframe-wrapper">
+                        <iframe src="https://ap2.ca.analytics.ibm.com/bi/?perspective=dashboard&amp;pathRef=.my_folders%2Fhotel%2B5%2Bdashboard&amp;closeWindowOnLastView=true&amp;ui_appbar=false&amp;ui_navbar=false&amp;shareMode=embedded&amp;action=view&amp;mode=dashboard&amp;subView=model0000019d4f0eef84_00000000&amp;nav_filter=true" 
+                                title="Cognos Dashboard" 
+                                allowfullscreen>
+                        </iframe>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard Page (Full Cognos) -->
+            <div id="dashboardPage" class="page">
+                <div class="embed-container">
+                    <div class="embed-header">
+                        <h3>📈 Full Analytics Dashboard - IBM Cognos</h3>
+                    </div>
+                    <div class="iframe-wrapper" style="height: 70vh;">
+                        <iframe src="https://ap2.ca.analytics.ibm.com/bi/?perspective=dashboard&amp;pathRef=.my_folders%2Fhotel%2B5%2Bdashboard&amp;closeWindowOnLastView=true&amp;ui_appbar=false&amp;ui_navbar=false&amp;shareMode=embedded&amp;action=view&amp;mode=dashboard&amp;subView=model0000019d4f0eef84_00000000&amp;nav_filter=true" 
+                                title="Full Dashboard" 
+                                style="height: 100%;"
+                                allowfullscreen>
+                        </iframe>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Insights Page -->
+            <div id="insightsPage" class="page">
+                <h2>📌 Key Business Insights</h2>
+                <div class="insights-grid" id="insightsGrid"></div>
+            </div>
+
+            <!-- Technologies Page -->
+            <div id="technologiesPage" class="page">
+                <h2>🛠️ Technology Stack</h2>
+                <div class="tech-grid" id="techGrid"></div>
+            </div>
+
+            <!-- Contact Page -->
+            <div id="contactPage" class="page">
+                <h2>📬 Contact Us</h2>
+                <div class="contact-form">
+                    <div class="form-group"><input type="text" id="contactName" placeholder="Full Name"></div>
+                    <div class="form-group"><input type="email" id="contactEmail" placeholder="Email Address"></div>
+                    <div class="form-group"><textarea rows="4" id="contactMsg" placeholder="Your Message"></textarea></div>
+                    <button class="submit-btn" id="sendBtn">Send Message ✨</button>
+                    <div id="formStatus" style="margin-top: 10px;"></div>
+                </div>
+            </div>
+
+            <footer class="footer">
+                <div class="social-links">
+                    <a href="#">🔗 LinkedIn</a>
+                    <a href="#">🐙 GitHub</a>
+                    <a href="#">🐦 Twitter</a>
+                </div>
+                <p>© 2025 GrandStay Hospitality Intelligence | Premium Analytics Dashboard</p>
+            </footer>
+        </main>
+    </div>
+
+    <script>
+        // Check login
+        if (sessionStorage.getItem('isLoggedIn') !== 'true') {
+            window.location.href = 'login.html';
+        }
+
+        // Hide loader
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                const loader = document.getElementById('loader');
+                if (loader) loader.classList.add('hide');
+            }, 800);
+            initCharts();
+        });
+
+        // Set username and date
+        document.getElementById('userName').textContent = sessionStorage.getItem('username') || 'Admin';
+        
+        function updateDateTime() {
+            const now = new Date();
+            document.getElementById('dateTime').textContent = now.toLocaleString('en-IN', { 
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', 
+                hour: '2-digit', minute: '2-digit' 
+            });
+        }
+        updateDateTime();
+        setInterval(updateDateTime, 1000);
+
+        // Navigation
+        const navItems = document.querySelectorAll('.nav-item');
+        const pages = ['overviewPage', 'dashboardPage', 'insightsPage', 'technologiesPage', 'contactPage'];
+
+        navItems.forEach(item => {
+            item.addEventListener('click', function() {
+                const pageName = this.getAttribute('data-page');
+                navItems.forEach(nav => nav.classList.remove('active'));
+                this.classList.add('active');
+                pages.forEach(page => {
+                    document.getElementById(page).classList.remove('active');
+                });
+                document.getElementById(pageName + 'Page').classList.add('active');
+                
+                // Refresh charts when overview page is shown
+                if (pageName === 'overview') {
+                    setTimeout(() => initCharts(), 100);
+                }
+            });
+        });
+
+        // Theme toggle
+        const themeToggle = document.getElementById('themeToggle');
+        themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('light');
+            localStorage.setItem('theme', document.body.classList.contains('light') ? 'light' : 'dark');
+            setTimeout(() => initCharts(), 50);
+        });
+
+        if (localStorage.getItem('theme') === 'light') {
+            document.body.classList.add('light');
+        }
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            sessionStorage.removeItem('isLoggedIn');
+            window.location.href = 'login.html';
+        });
+
+        // Chart Initialization
+        let revenueChart, roomChart, ratingChart, propertyChart;
+
+        function initCharts() {
+            // Destroy existing charts
+            if (revenueChart) revenueChart.destroy();
+            if (roomChart) roomChart.destroy();
+            if (ratingChart) ratingChart.destroy();
+            if (propertyChart) propertyChart.destroy();
+
+            const isDark = !document.body.classList.contains('light');
+            const textColor = isDark ? '#f1f5f9' : '#0f172a';
+            const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+
+            // Revenue Chart
+            const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+            revenueChart = new Chart(revenueCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                    datasets: [{
+                        label: 'Revenue (₹ Lakhs)',
+                        data: [85, 92, 78, 105, 98, 112, 108, 125, 142, 210, 168, 145],
+                        borderColor: '#22D3EE',
+                        backgroundColor: 'rgba(34, 211, 238, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#22D3EE',
+                        pointBorderColor: '#fff',
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: textColor } }
+                    },
+                    scales: {
+                        y: { grid: { color: gridColor }, ticks: { color: textColor } },
+                        x: { grid: { color: gridColor }, ticks: { color: textColor } }
+                    }
+                }
+            });
+
+            // Room Type Chart (Pie)
+            const roomCtx = document.getElementById('roomChart').getContext('2d');
+            roomChart = new Chart(roomCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Suite (45%)', 'Deluxe (30%)', 'Standard (25%)'],
+                    datasets: [{
+                        data: [45, 30, 25],
+                        backgroundColor: ['#22D3EE', '#0891B2', '#06B6D4'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: textColor } }
+                    }
+                }
+            });
+
+            // Rating Distribution Chart
+            const ratingCtx = document.getElementById('ratingChart').getContext('2d');
+            ratingChart = new Chart(ratingCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['1-2', '2-3', '3-4', '4-5', '5-6', '6-7', '7-8', '8-9', '9-10'],
+                    datasets: [{
+                        label: 'Number of Reviews',
+                        data: [12, 18, 25, 32, 28, 22, 15, 10, 8],
+                        backgroundColor: '#22D3EE',
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: textColor } }
+                    },
+                    scales: {
+                        y: { grid: { color: gridColor }, ticks: { color: textColor } },
+                        x: { grid: { color: gridColor }, ticks: { color: textColor, rotation: 45 } }
+                    }
+                }
+            });
+
+            // Property Revenue Chart
+            const propertyCtx = document.getElementById('propertyChart').getContext('2d');
+            propertyChart = new Chart(propertyCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Jaipur', 'Mumbai', 'Delhi', 'Bengaluru', 'Goa', 'Chennai'],
+                    datasets: [{
+                        label: 'Revenue (₹ Crores)',
+                        data: [3.2, 2.8, 2.5, 2.3, 1.8, 1.6],
+                        backgroundColor: 'rgba(34, 211, 238, 0.7)',
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { labels: { color: textColor } }
+                    },
+                    scales: {
+                        x: { grid: { color: gridColor }, ticks: { color: textColor } },
+                        y: { grid: { color: gridColor }, ticks: { color: textColor } }
+                    }
+                }
+            });
+        }
+
+        // Insights Data
+        document.getElementById('insightsGrid').innerHTML = `
+            <div class="insight-card">🏆 <strong>Top Property:</strong> GrandStay Jaipur - ₹3.2Cr revenue, 6.2 rating</div>
+            <div class="insight-card">📊 <strong>Booking Channel:</strong> Direct 35% | Online 28% | Agent 37%</div>
+            <div class="insight-card">⭐ <strong>Review Platforms:</strong> TripAdvisor avg 7.2, MakeMyTrip avg 5.1</div>
+            <div class="insight-card">🌍 <strong>Guest Nationality:</strong> Indian 28%, British 22%, American 18%, Australian 16%</div>
+            <div class="insight-card">📈 <strong>Peak Season:</strong> October 2024 - ₹2.1Cr revenue</div>
+            <div class="insight-card">💎 <strong>Upsell Opportunity:</strong> F&B + Spa cross-sell increases total bill by 19%</div>
+            <div class="insight-card">🛏️ <strong>Room Type Popularity:</strong> Suite (45%), Deluxe (30%), Standard (25%)</div>
+            <div class="insight-card">📅 <strong>Best Day:</strong> Weekends show 32% higher occupancy</div>
+        `;
+
+        // Technologies Data
+        document.getElementById('techGrid').innerHTML = `
+            <div class="tech-card"><div style="font-size:2rem;">📊</div><h3>IBM Cognos Analytics</h3><p>Enterprise BI dashboard with real-time hotel metrics</p></div>
+            <div class="tech-card"><div style="font-size:2rem;">🎨</div><h3>Glassmorphism UI</h3><p>Modern dark/light theme with smooth animations</p></div>
+            <div class="tech-card"><div style="font-size:2rem;">📈</div><h3>Chart.js</h3><p>Interactive data visualizations and charts</p></div>
+            <div class="tech-card"><div style="font-size:2rem;">⚡</div><h3>HTML5/CSS3/JS</h3><p>Responsive frontend with zero dependencies</p></div>
+            <div class="tech-card"><div style="font-size:2rem;">🐍</div><h3>Python ETL</h3><p>Automated data pipeline for booking analytics</p></div>
+            <div class="tech-card"><div style="font-size:2rem;">☁️</div><h3>AWS Cloud</h3><p>Scalable hosting and secure data storage</p></div>
+        `;
+
+        // Contact Form
+        document.getElementById('sendBtn').addEventListener('click', function() {
+            const name = document.getElementById('contactName').value.trim();
+            const email = document.getElementById('contactEmail').value.trim();
+            const msg = document.getElementById('contactMsg').value.trim();
+            const status = document.getElementById('formStatus');
+            
+            if (name && email && msg) {
+                if (!email.includes('@') || !email.includes('.')) {
+                    status.innerHTML = '❌ Please enter a valid email address';
+                    status.style.color = '#ef4444';
+                } else {
+                    status.innerHTML = '✅ Message sent successfully! Our team will contact you soon.';
+                    status.style.color = '#22c55e';
+                    document.getElementById('contactName').value = '';
+                    document.getElementById('contactEmail').value = '';
+                    document.getElementById('contactMsg').value = '';
+                    setTimeout(() => status.innerHTML = '', 3000);
+                }
+            } else {
+                status.innerHTML = '❌ Please fill all fields';
+                status.style.color = '#ef4444';
+            }
+        });
+    </script>
+</body>
+</html>
